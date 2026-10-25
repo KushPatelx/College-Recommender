@@ -1,4 +1,4 @@
-export const API_BASE_URL = "http://localhost:5000";
+export const API_BASE_URL = "http://3.86.147.73:5000";
 
 export const INITIAL_FORM_DATA = {
   ssc_marks: 88.5,

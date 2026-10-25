@@ -3,7 +3,6 @@ import json
 from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import List, Optional
-
 import joblib
 import numpy as np
 import pandas as pd
@@ -12,6 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from decimal import Decimal
 
 # Load environment variables for AWS (from .env file)
 load_dotenv()
@@ -74,11 +74,43 @@ def resolve_file_path(filename: str, subfolder: str) -> str:
         raise FileNotFoundError(f"Required file '{filename}' not found.")
 
 def build_sandbox() -> pd.DataFrame:
-    """Directly loads the pre-merged Master CSV."""
-    data_path = resolve_file_path("Backend_Data.csv", "data")
-    sandbox = pd.read_csv(data_path)
-    sandbox["Base_Tuition_Fee"] = sandbox["Base_Tuition_Fee"].fillna(100000.0)
+    """Fetches data from AWS DynamoDB and builds the Pandas DataFrame."""
+    print("⏳ Fetching data from AWS DynamoDB...")
+    
+    # DynamoDB connection setup
+    dynamodb = boto3.resource(
+        'dynamodb',
+        region_name=os.getenv('AWS_DEFAULT_REGION', 'us-east-1'),
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+        aws_session_token=os.getenv('AWS_SESSION_TOKEN')
+    )
+    table = dynamodb.Table('CollegeRecommendationDB')
+    
+    # Scan karke saara data fetch karna
+    response = table.scan()
+    items = response.get('Items', [])
+    
+    # AWS pagination handle karna (agar data bada ho)
+    while 'LastEvaluatedKey' in response:
+        response = table.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
+        items.extend(response.get('Items', []))
+        
+    print(f"✅ Fetched {len(items)} records from DynamoDB.")
+    
+    # Cloud data ko Pandas DataFrame mein convert karna
+    sandbox = pd.DataFrame(items)
+    
+    # AWS DynamoDB numbers ko 'Decimal' format mein bhejta hai, 
+    # ML model ke liye inko float mein convert karna zaroori hai.
+    for col in sandbox.columns:
+        if sandbox[col].apply(lambda x: isinstance(x, Decimal)).any():
+            sandbox[col] = sandbox[col].astype(float)
+            
+    # Purana data cleaning logic (Same as before)
+    sandbox["Base_Tuition_Fee"] = pd.to_numeric(sandbox["Base_Tuition_Fee"], errors='coerce').fillna(100000.0)
     sandbox = sandbox.dropna(subset=["Course_Domain"]).reset_index(drop=True)
+    
     return sandbox
 
 # ==========================================
