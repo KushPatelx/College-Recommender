@@ -1,4 +1,4 @@
-export const API_BASE_URL = "https://biwfm-18-204-206-223.free.pinggy.net";
+export const API_BASE_URL = "https://naivx-18-204-206-223.free.pinggy.net";
 
 export const INITIAL_FORM_DATA = {
   ssc_marks: 88.5,
