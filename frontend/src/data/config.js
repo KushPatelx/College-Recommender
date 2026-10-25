@@ -1,4 +1,4 @@
-export const API_BASE_URL = "https://ayjix-18-204-206-223.run.pinggy-free.link";
+export const API_BASE_URL = "https://biwfm-18-204-206-223.free.pinggy.net";
 
 export const INITIAL_FORM_DATA = {
   ssc_marks: 88.5,
