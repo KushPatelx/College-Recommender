@@ -131,10 +131,7 @@ app.post("/api/recommend", verifyToken, async (req, res) => {
 
     const pythonResponse = await fetch("http://127.0.0.1:8000/api/recommend", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Bypass-Tunnel-Reminder": "true",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req.body),
     });
 

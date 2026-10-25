@@ -38,10 +38,7 @@ export default function App() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Bypass-Tunnel-Reminder": "true",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(loginForm),
       });
       const data = await response.json();

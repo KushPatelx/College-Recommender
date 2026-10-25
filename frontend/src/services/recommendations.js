@@ -3,7 +3,6 @@ export async function requestRecommendations(baseUrl, payloadData, token) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Bypass-Tunnel-Reminder": "true",
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(payloadData),
