@@ -1,4 +1,4 @@
-export const API_BASE_URL = "https://zbfoo-18-204-206-223.free.pinggy.net";
+export const API_BASE_URL = "https://thru-maintenance-leadership-artist.trycloudflare.com";
 
 export const INITIAL_FORM_DATA = {
   ssc_marks: 88.5,
