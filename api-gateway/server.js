@@ -15,7 +15,13 @@ const PORT = 5000;
 // Security secret key
 const JWT_SECRET = process.env.JWT_SECRET || "super_secret_college_key";
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "https://main.d1ox2kc9umbez3.amplifyapp.com",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+  }),
+);
 app.use(express.json());
 
 // DynamoDB Setup (For future Phase)
@@ -125,7 +131,10 @@ app.post("/api/recommend", verifyToken, async (req, res) => {
 
     const pythonResponse = await fetch("http://127.0.0.1:8000/api/recommend", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Bypass-Tunnel-Reminder": "true",
+      },
       body: JSON.stringify(req.body),
     });
 

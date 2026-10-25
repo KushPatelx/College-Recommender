@@ -1,4 +1,4 @@
-export const API_BASE_URL = "https://metal-beans-kiss.loca.lt";
+export const API_BASE_URL = "https://rotten-carrots-guess.loca.lt";
 
 export const INITIAL_FORM_DATA = {
   ssc_marks: 88.5,
