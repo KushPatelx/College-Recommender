@@ -12,15 +12,23 @@ import ResultsPage from "./pages/ResultsPage";
 import useScrollReveal from "./hooks/useScrollReveal";
 import "./styles/global.css";
 
+// FIX: Keep RequireAuth outside App so its component identity
+// remains stable across App re-renders.
+function RequireAuth({ token, children }) {
+  return token ? children : <Navigate to="/login" replace />;
+}
+
 export default function App() {
   const navigate = useNavigate();
 
-  // --- NEW: AUTH STATE ---
+  // --- AUTH STATE ---
   const [token, setToken] = useState(localStorage.getItem("dwm_token") || null);
+
   const [loginForm, setLoginForm] = useState({
     email: "abhay@student.com",
     password: "password123",
   });
+
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
 
@@ -30,22 +38,25 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // --- NEW: LOGIN HANDLER ---
+  // --- LOGIN HANDLER ---
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setAuthLoading(true);
     setAuthError(null);
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(loginForm),
       });
+
       const data = await response.json();
+
       if (data.success) {
         setToken(data.token);
         localStorage.setItem("dwm_token", data.token);
-        navigate("/recommender"); // Login success hone par dashboard bhej do
+        navigate("/recommender");
       } else {
         setAuthError(data.message || "Invalid credentials");
       }
@@ -68,6 +79,7 @@ export default function App() {
   // Existing Handlers
   const handleChange = (event) => {
     const { name, value, type } = event.target;
+
     setFormData((previous) => ({
       ...previous,
       [name]:
@@ -86,8 +98,9 @@ export default function App() {
     setError(null);
 
     try {
-      // NOTE: token is passed as 3rd parameter now!
+      // Existing backend request: unchanged
       const data = await requestRecommendations(API_BASE_URL, formData, token);
+
       setResults(data);
       navigate("/results");
       return true;
@@ -98,6 +111,7 @@ export default function App() {
       } else {
         setError(err.message || "Could not connect to Node API Gateway.");
       }
+
       return false;
     } finally {
       setLoading(false);
@@ -111,16 +125,11 @@ export default function App() {
 
   useScrollReveal();
 
-  // --- NEW: PROTECTED ROUTE WRAPPER ---
-  const RequireAuth = ({ children }) => {
-    return token ? children : <Navigate to="/login" replace />;
-  };
-
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
 
-      {/* NEW: INLINE LOGIN ROUTE */}
+      {/* LOGIN ROUTE */}
       <Route
         path="/login"
         element={
@@ -149,14 +158,19 @@ export default function App() {
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Email Address
                     </label>
+
                     <div className="relative">
                       <Mail className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" />
+
                       <input
                         type="email"
                         name="email"
                         value={loginForm.email}
                         onChange={(e) =>
-                          setLoginForm({ ...loginForm, email: e.target.value })
+                          setLoginForm({
+                            ...loginForm,
+                            email: e.target.value,
+                          })
                         }
                         className="w-full pl-10 pr-3 py-2.5 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none"
                         required
@@ -168,8 +182,10 @@ export default function App() {
                     <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Password
                     </label>
+
                     <div className="relative">
                       <Lock className="w-5 h-5 text-slate-400 absolute left-3 top-2.5" />
+
                       <input
                         type="password"
                         name="password"
@@ -204,27 +220,28 @@ export default function App() {
         }
       />
 
-      {/* PROTECTED ROUTES */}
+      {/* PROTECTED RECOMMENDER ROUTE */}
       <Route
         path="/recommender"
         element={
-          <RequireAuth>
+          <RequireAuth token={token}>
             <RecommenderPage
               formData={formData}
               onChange={handleChange}
               onSubmit={handleSubmit}
               onPresetSelect={applyPreset}
               loading={loading}
-              onLogout={handleLogout} // Optional: Pass logout to header if needed
+              onLogout={handleLogout}
             />
           </RequireAuth>
         }
       />
 
+      {/* PROTECTED RESULTS ROUTE */}
       <Route
         path="/results"
         element={
-          <RequireAuth>
+          <RequireAuth token={token}>
             <ResultsPage
               formData={formData}
               results={results}
