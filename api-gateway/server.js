@@ -27,22 +27,12 @@ app.use(express.json());
 // DynamoDB Setup (For future Phase)
 const client = new DynamoDBClient({
   region: process.env.AWS_DEFAULT_REGION || "us-east-1",
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    sessionToken: process.env.AWS_SESSION_TOKEN,
-  },
 });
 const docClient = DynamoDBDocumentClient.from(client);
 
 // S3 Client Setup
 const s3Client = new S3Client({
   region: process.env.AWS_DEFAULT_REGION || "us-east-1",
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    sessionToken: process.env.AWS_SESSION_TOKEN,
-  },
 });
 
 // ==========================================
