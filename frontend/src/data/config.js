@@ -1,4 +1,4 @@
-export const API_BASE_URL = "https://portrait-harrison-salon-weighted.trycloudflare.com";
+export const API_BASE_URL = "https://documentary-cloudy-independent-subsection.trycloudflare.com";
 
 export const INITIAL_FORM_DATA = {
   ssc_marks: 88.5,
