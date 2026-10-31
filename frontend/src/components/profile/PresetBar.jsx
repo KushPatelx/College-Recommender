@@ -1,16 +1,49 @@
-import { Sparkles, ArrowUpRight } from "lucide-react";
+import {
+  Sparkles,
+  ArrowUpRight,
+  MousePointerClick,
+} from "lucide-react";
 
 export default function PresetBar({ presets, onSelect }) {
   return (
-    <div className="preset-bar reveal-item">
-      <div className="preset-intro"><span className="preset-spark"><Sparkles size={17} /></span><div><strong>Try a demo profile</strong><small>One click. Instant model run.</small></div></div>
-      <div className="preset-options">
+    <section className="pw-preset-card">
+      <div className="pw-preset-heading">
+        <div className="pw-preset-icon">
+          <Sparkles size={19} />
+        </div>
+
+        <div>
+          <h3>Explore demo profiles</h3>
+          <p>Not sure where to start? Try a sample student profile.</p>
+        </div>
+      </div>
+
+      <div className="pw-preset-options">
         {presets.map((preset) => (
-          <button type="button" className="preset-button" key={preset.label} onClick={() => onSelect(preset)}>
-            <span className="preset-emoji">{preset.emoji}</span>{preset.label}<ArrowUpRight size={14} className="preset-arrow" />
+          <button
+            type="button"
+            className="pw-preset-button"
+            key={preset.label}
+            onClick={() => onSelect(preset)}
+          >
+            <span className="pw-preset-emoji">
+              {preset.emoji}
+            </span>
+
+            <span>{preset.label}</span>
+
+            <ArrowUpRight
+              size={15}
+              className="pw-preset-arrow"
+            />
           </button>
         ))}
       </div>
-    </div>
+
+      <div className="pw-preset-footnote">
+        <MousePointerClick size={14} />
+        Select any profile to automatically fill the form.
+      </div>
+    </section>
   );
 }

@@ -1,4 +1,11 @@
-import { ArrowDown, Activity, GraduationCap } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowDown,
+  Activity,
+  GraduationCap,
+  ShieldCheck,
+} from "lucide-react";
+
 import { DEMO_PRESETS } from "../data/config";
 import { formatINR } from "../utils/format";
 import PresetBar from "../components/profile/PresetBar";
@@ -13,72 +20,94 @@ export default function RecommenderPage({
   loading,
 }) {
   useScrollReveal();
+
   return (
-    <div className="app-shell">
-      <header className="site-header">
-        <div className="page-container nav-inner">
-          <a className="brand" href="/" aria-label="Pathwise home">
-            <span className="brand-icon">
-              <GraduationCap size={21} strokeWidth={2.2} />
+    <div className="pw-app-shell">
+      <header className="pw-work-header">
+        <div className="pw-work-header-inner">
+          <a className="pw-brand" href="/" aria-label="Pathwise home">
+            <span className="pw-brand-icon">
+              <GraduationCap size={22} />
             </span>
-            <span className="brand-copy">
-              <strong>
-                pathwise<span>.</span>
-              </strong>
-              <small>ENGINEERING, REIMAGINED</small>
+
+            <span className="pw-brand-copy">
+              <strong>pathwise<span>.</span></strong>
+              <small>YOUR ADMISSION COMPASS</small>
             </span>
           </a>
 
-          <a className="text-link" href="/">
+          <a href="/" className="pw-back-link">
+            <ArrowLeft size={16} />
             Back to home
           </a>
         </div>
       </header>
 
-      <main>
-        <section className="workspace section-reveal" id="recommender">
-          <div className="page-container">
-            <PresetBar presets={DEMO_PRESETS} onSelect={onPresetSelect} />
+      <main className="pw-work-main">
+        <div className="pw-work-container">
 
-            <div className="workspace-heading">
-              <div>
-                <span className="eyebrow">
-                  <Activity size={14} /> YOUR ADMISSION WORKSPACE
-                </span>
-                <h2>
-                  Make your next move <span>with clarity.</span>
-                </h2>
-                <p>
-                  Tune your profile, then let the hybrid engine find your
-                  best-fit colleges.
-                </p>
-              </div>
+          <div className="pw-work-welcome">
+            <div>
+              <span className="pw-eyebrow">
+                <Activity size={15} />
+                ADMISSION PLANNER
+              </span>
 
-              <a className="text-link" href="/results">
-                Explore results <ArrowDown size={15} />
-              </a>
+              <h1>
+                Your future starts <span>with a choice.</span>
+              </h1>
+
+              <p>
+                Share your academic profile and preferences to discover
+                engineering colleges that match your goals.
+              </p>
             </div>
 
-            <div className="dashboard-grid">
-              <ProfileForm
-                formData={formData}
-                onChange={onChange}
-                onSubmit={onSubmit}
-                loading={loading}
-                formatINR={formatINR}
-              />
+            <div className="pw-secure-note">
+              <ShieldCheck size={17} />
+              <span>Personalised profile analysis</span>
             </div>
           </div>
-        </section>
+
+          <PresetBar
+            presets={DEMO_PRESETS}
+            onSelect={onPresetSelect}
+          />
+
+          <div className="pw-form-intro">
+            <div>
+              <span className="pw-section-label">BUILD YOUR PROFILE</span>
+              <h2>Tell us about yourself.</h2>
+              <p>
+                Complete both sections to generate your college shortlist.
+              </p>
+            </div>
+
+            <a href="#student-profile" className="pw-text-link">
+              Go to profile <ArrowDown size={15} />
+            </a>
+          </div>
+
+          <div id="student-profile">
+            <ProfileForm
+              formData={formData}
+              onChange={onChange}
+              onSubmit={onSubmit}
+              loading={loading}
+              formatINR={formatINR}
+            />
+          </div>
+
+        </div>
       </main>
 
-      <footer className="site-footer">
-        <div className="page-container footer-inner">
-          <span className="footer-mark">
+      <footer className="pw-work-footer">
+        <div className="pw-work-footer-inner">
+          <span>
             <GraduationCap size={17} />
-            HYBRID ENGINEERING COLLEGE RECOMMENDER
+            PATHWISE
           </span>
-          <span>Decision support, powered by data.</span>
+          <p>Smarter choices. Better possibilities.</p>
         </div>
       </footer>
     </div>

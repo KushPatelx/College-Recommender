@@ -3,41 +3,44 @@ import {
   ShieldAlert,
   GraduationCap,
   Sparkles,
-  ArrowUpRight,
+  RefreshCw,
 } from "lucide-react";
+
+import { Link } from "react-router-dom";
 import RecommendationCard from "./RecommendationCard";
 
 function EmptyState() {
   return (
-    <div className="empty-state section-reveal">
-      <div className="empty-icon">
-        <GraduationCap size={30} />
+    <div className="pw-empty-state">
+      <div className="pw-empty-icon">
+        <GraduationCap size={32} />
       </div>
-      <span className="eyebrow">YOUR NEXT CHAPTER</span>
-      <h3>Your shortlist starts here.</h3>
+
+      <span>YOUR NEXT CHAPTER</span>
+
+      <h3>Your college shortlist starts here.</h3>
+
       <p>
-        Adjust your profile and preferences, or pick a demo scenario above. Your
-        recommendations will appear here, ranked by model probability and
-        preference fit.
+        Generate recommendations using your academic profile and
+        preferences. Your best-fit colleges will appear here.
       </p>
-      <div className="empty-decoration">
-        <span />
-        <span />
-        <span />
-      </div>
+
+      <Link to="/recommender" className="pw-empty-button">
+        Create my profile
+      </Link>
     </div>
   );
 }
 
 function LoadingState() {
   return (
-    <div className="loading-list" aria-label="Loading recommendations">
+    <div className="pw-loading-list" aria-label="Loading recommendations">
       {[1, 2, 3].map((item) => (
-        <div className="loading-card" key={item}>
-          <div className="skeleton skeleton-title" />
-          <div className="skeleton skeleton-subtitle" />
-          <div className="skeleton skeleton-line" />
-          <div className="skeleton skeleton-line short" />
+        <div className="pw-loading-card" key={item}>
+          <div className="pw-skeleton pw-skeleton-small" />
+          <div className="pw-skeleton pw-skeleton-title" />
+          <div className="pw-skeleton pw-skeleton-line" />
+          <div className="pw-skeleton pw-skeleton-line short" />
         </div>
       ))}
     </div>
@@ -51,54 +54,78 @@ export default function ResultsPanel({
   formatINR,
   getProbabilityTheme,
 }) {
+  const recommendations = results?.recommendations || [];
+
   return (
-    <div className="results-panel">
-      <div className="results-heading reveal-item">
+    <section className="pw-results-panel">
+
+      <div className="pw-results-panel-heading">
         <div>
-          <span className="eyebrow">
-            <Sparkles size={13} /> THE HYBRID ENGINE
+          <span className="pw-engine-label">
+            <Sparkles size={14} />
+            POWERED BY HYBRID ENGINE
           </span>
-          <h2>
-            Your college <em>shortlist.</em>
-          </h2>
-          <p>Ranked options, with the signals behind each match.</p>
+
+          <h3>Your college shortlist</h3>
+
+          <p>
+            Ranked colleges with admission estimates and preference matching.
+          </p>
         </div>
+
         {results && (
-          <span className="result-count">
-            {results.recommendations.length.toString().padStart(2, "0")}{" "}
-            <small>matches</small>
-          </span>
+          <div className="pw-match-count">
+            <strong>
+              {recommendations.length.toString().padStart(2, "0")}
+            </strong>
+            <span>matches</span>
+          </div>
         )}
       </div>
+
       {error && (
-        <div className="error-state">
-          <div className="error-icon">
-            <ShieldAlert size={20} />
+        <div className="pw-error-state">
+          <div className="pw-error-icon">
+            <ShieldAlert size={21} />
           </div>
+
           <div>
-            <strong>Backend connection error</strong>
+            <strong>Unable to generate recommendations</strong>
             <p>{error}</p>
             <small>
-              Check that your FastAPI server is running on port 8000.
+              Please check that your backend server is running and try again.
             </small>
           </div>
         </div>
       )}
+
       {loading && <LoadingState />}
+
       {!results && !loading && !error && <EmptyState />}
-      {results && results.recommendations.length === 0 && !loading && (
-        <div className="no-results">
-          <AlertTriangle size={24} />
-          <h3>No colleges crossed the 30% probability threshold.</h3>
+
+      {results && recommendations.length === 0 && !loading && (
+        <div className="pw-no-results">
+          <div className="pw-no-results-icon">
+            <AlertTriangle size={25} />
+          </div>
+
+          <h3>No matching colleges found.</h3>
+
           <p>
-            Try a higher MHT-CET percentile or adjust category and domain
-            preferences.
+            No colleges crossed the 30% probability threshold.
+            Try adjusting your CET percentile, category or domain preferences.
           </p>
+
+          <Link to="/recommender" className="pw-empty-button">
+            <RefreshCw size={15} />
+            Adjust my profile
+          </Link>
         </div>
       )}
-      {results && results.recommendations.length > 0 && !loading && (
-        <div className="recommendation-list">
-          {results.recommendations.map((item) => (
+
+      {recommendations.length > 0 && !loading && (
+        <div className="pw-recommendation-list">
+          {recommendations.map((item) => (
             <RecommendationCard
               key={item.rank}
               item={item}
@@ -108,18 +135,21 @@ export default function ResultsPanel({
           ))}
         </div>
       )}
-      {results && results.recommendations.length > 0 && !loading && (
-        <div className="results-footnote">
-          <span>
-            <span className="footnote-dot" /> MODEL OUTPUT
-          </span>
+
+      {recommendations.length > 0 && !loading && (
+        <div className="pw-results-disclaimer">
+          <div>
+            <ShieldAlert size={16} />
+            <strong>Important information</strong>
+          </div>
+
           <p>
-            Admission probabilities are estimates based on the model and
-            available data, not a guarantee of admission.
+            Admission probabilities are estimates based on the model
+            and available data. They do not guarantee admission.
           </p>
-          <ArrowUpRight size={15} />
         </div>
       )}
-    </div>
+
+    </section>
   );
 }

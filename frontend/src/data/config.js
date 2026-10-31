@@ -1,4 +1,4 @@
-export const API_BASE_URL = "https://protein-both-integrity-mustang.trycloudflare.com";
+export const API_BASE_URL = "http://localhost:5000";
 
 export const INITIAL_FORM_DATA = {
   ssc_marks: 88.5,

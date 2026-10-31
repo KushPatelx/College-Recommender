@@ -1,140 +1,133 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-const {
-  DynamoDBDocumentClient,
-  ScanCommand,
-} = require("@aws-sdk/lib-dynamodb");
 const jwt = require("jsonwebtoken");
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+const cookieParser = require("cookie-parser");
 
 const app = express();
 const PORT = 5000;
-
-// Security secret key
 const JWT_SECRET = process.env.JWT_SECRET || "super_secret_college_key";
 
-app.use(
-  cors({
-    origin: "https://main.d1ox2kc9umbez3.amplifyapp.com",
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    credentials: true,
-  }),
-);
+app.use(cors({
+  origin: "http://localhost:5173",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true,
+}));
 app.use(express.json());
+app.use(cookieParser());
 
-// DynamoDB Setup (For future Phase)
-const client = new DynamoDBClient({
-  region: process.env.AWS_DEFAULT_REGION || "us-east-1",
-});
-const docClient = DynamoDBDocumentClient.from(client);
+// MONGODB CONNECTION
+mongoose.connect('mongodb+srv://abhay_panchal:1234@cluster0.ois4m98.mongodb.net/collegeDB')
+    .then(() => console.log('✅ MongoDB Connected to collegeDB'))
+    .catch(err => console.log('❌ MongoDB Connection Error:', err));
 
-// S3 Client Setup
-const s3Client = new S3Client({
-  region: process.env.AWS_DEFAULT_REGION || "us-east-1",
-});
+// SCHEMAS
+const collegeSchema = new mongoose.Schema({
+    College_Name: String, Branch_Name: String, College_Tier: String,
+    City_Name: String, City_Tier: String, Course_Domain: String,
+    Fee_OPEN: Number, Fee_OBC: Number, Fee_SC: Number, Fee_ST: Number, Fee_VJNT: Number,
+    Base_Tuition_Fee: Number, Institute_Type: String, Minority_Status: String,
+    Current_Avg_Package: Number, Current_Highest_Package: Number, Top_Recruiters: String
+}, { collection: 'colleges' });
+const College = mongoose.model('College', collegeSchema);
 
-// ==========================================
-// Login Route (Authentication + S3 Logging)
-// ==========================================
-app.post("/api/login", (req, res) => {
-  const { email, password } = req.body;
+const userSchema = new mongoose.Schema({
+    email: { type: String, required: true, unique: true },
+    passwordHash: { type: String, required: true },
+    role: { type: String, default: 'student' }
+}, { discriminatorKey: 'userType' });
+const User = mongoose.model('User', userSchema);
 
-  if (email === "abhay@student.com" && password === "password123") {
-    const token = jwt.sign({ email: email, role: "student" }, JWT_SECRET, {
-      expiresIn: "1h",
-    });
+const Student = User.discriminator('Student', new mongoose.Schema({
+    percentile: Number,
+    branchPreference: [String],
+    budget: Number
+}));
 
+// API ROUTES
+app.post("/api/register", async (req, res) => {
     try {
-      const logData = {
-        event: "USER_LOGIN",
-        user: email,
-        timestamp: new Date().toISOString(),
-        status: "SUCCESS",
-      };
+        const { email, password } = req.body;
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
 
-      const command = new PutObjectCommand({
-        Bucket: "abhay-college-logs-2026",
-        Key: `login-logs/${email.split("@")[0]}-${Date.now()}.json`,
-        Body: JSON.stringify(logData, null, 2),
-        ContentType: "application/json",
-      });
-
-      s3Client
-        .send(command)
-        .then(() =>
-          console.log(
-            `✅ Login audit log successfully saved to S3 for ${email}`,
-          ),
-        )
-        .catch((err) => console.error("❌ S3 Logging failed:", err));
+        const newStudent = new Student({ email, passwordHash: hashedPassword });
+        await newStudent.save();
+        res.json({ success: true, message: "Student registered successfully!" });
     } catch (error) {
-      console.error("S3 Setup Error:", error);
+        res.status(500).json({ success: false, error: "Registration failed." });
     }
-
-    res.json({
-      success: true,
-      message: "Login successful!",
-      token: token,
-    });
-  } else {
-    res
-      .status(401)
-      .json({ success: false, message: "Email ya Password galat hai" });
-  }
 });
 
-// ==========================================
-// JWT Middleware (Chowkidar)
-// ==========================================
+app.post("/api/login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await User.findOne({ email });
+
+        if (!user) return res.status(401).json({ success: false, message: "User not found" });
+
+        const isMatch = await bcrypt.compare(password, user.passwordHash);
+        if (!isMatch) return res.status(401).json({ success: false, message: "Invalid credentials" });
+
+        const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "1h" });
+        
+        res.cookie("jwt", token, {
+            httpOnly: true,
+            secure: false, 
+            sameSite: "lax", 
+            maxAge: 3600000
+        });
+
+        res.json({ success: true, message: "Login successful!" });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Login failed" });
+    }
+});
+
+// NAYA ROUTE: Proper Backend Logout
+app.post("/api/logout", (req, res) => {
+    res.clearCookie("jwt", {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax"
+    });
+    res.json({ success: true, message: "Logged out successfully" });
+});
+
 const verifyToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
-
-  if (!authHeader) {
-    return res
-      .status(403)
-      .json({ error: "Access Denied! Bhai pehle login kar." });
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res
-      .status(401)
-      .json({ error: "Invalid ya expired token! Wapas login kar." });
-  }
+    const token = req.cookies.jwt;
+    if (!token) return res.status(403).json({ error: "Access Denied! No token provided." });
+    try {
+        req.user = jwt.verify(token, JWT_SECRET);
+        next();
+    } catch (error) {
+        res.status(401).json({ error: "Invalid token!" });
+    }
 };
 
-// ==========================================
-// Python Compute Engine Route (Proxy) - SECURED
-// ==========================================
+app.get('/api/top-colleges', async (req, res) => {
+    try {
+        const colleges = await College.find({}).limit(50);
+        res.json({ success: true, data: colleges });
+    } catch (error) {
+        res.status(500).json({ success: false, error: "Database error" });
+    }
+});
+
 app.post("/api/recommend", verifyToken, async (req, res) => {
   try {
-    console.log(
-      "Valid Token found! Routing request to Python FastAPI Compute Engine...",
-    );
-
     const pythonResponse = await fetch("http://127.0.0.1:8000/api/recommend", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req.body),
     });
-
     const data = await pythonResponse.json();
     res.json(data);
   } catch (error) {
-    console.error("FastAPI Engine Error:", error);
-    res
-      .status(500)
-      .json({ error: "Compute Engine is down or processing too long." });
+    res.status(500).json({ error: "Compute Engine is down." });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 API Gateway running on http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 API Gateway running on http://localhost:${PORT}`));

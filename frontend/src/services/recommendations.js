@@ -1,27 +1,23 @@
-export async function requestRecommendations(baseUrl, payloadData, token) {
-  const response = await fetch(`${baseUrl}/api/recommend`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payloadData),
-  });
+export const requestRecommendations = async (baseUrl, formData) => {
+  try {
+    const response = await fetch(`${baseUrl}/api/recommend`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // Authorization header nikal diya hai kyunki ab HTTP-Only cookie use ho rahi hai
+      },
+      credentials: "include", // 👈 Ye line browser ko cookie Express tak bhejne ki permission deti hai
+      body: JSON.stringify(formData),
+    });
 
-  if (response.status === 401 || response.status === 403) {
-    throw new Error("401 Unauthorized");
-  }
+    const data = await response.json();
 
-  if (!response.ok) {
-    let message = "Failed to fetch recommendations from server.";
-    try {
-      const errorData = await response.json();
-      message = errorData.detail || errorData.error || message;
-    } catch {
-      // Keep the fallback message when the server response isn't JSON.
+    if (!response.ok) {
+      throw new Error(data.error || data.message || "Failed to fetch recommendations");
     }
-    throw new Error(message);
-  }
 
-  return response.json();
-}
+    return data;
+  } catch (error) {
+    throw error;
+  }
+};

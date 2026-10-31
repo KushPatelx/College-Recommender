@@ -6,54 +6,27 @@ from typing import List, Optional
 import joblib
 import numpy as np
 import pandas as pd
-import boto3
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from dotenv import load_dotenv
-from decimal import Decimal
+from pymongo import MongoClient
 
-# Load environment variables for AWS (from .env file)
-load_dotenv()
-
-# ==========================================
-# AWS S3 SETUP (Logging)
-# ==========================================
-s3_client = boto3.client(
-    's3',
-    region_name=os.getenv('AWS_DEFAULT_REGION', 'us-east-1'),
-    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-    aws_session_token=os.getenv('AWS_SESSION_TOKEN')
-)
-BUCKET_NAME = "abhay-college-logs-2026"
-
-def log_failure_to_s3(error_details: Exception, module: str = "RecommendationEngine"):
-    """Logs system failures to AWS S3 bucket for diagnostics."""
+def log_failure_local(error_details: Exception, module: str = "RecommendationEngine"):
     try:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        file_name = f"crash-logs/error-{timestamp}.json"
-        
         log_data = {
             "timestamp": timestamp,
             "error_message": str(error_details),
             "module": module,
             "status": "FAILED"
         }
-        
-        s3_client.put_object(
-            Bucket=BUCKET_NAME,
-            Key=file_name,
-            Body=json.dumps(log_data, indent=4),
-            ContentType='application/json'
-        )
-        print(f"✅ S3 Log Uploaded Successfully: {file_name}")
+        os.makedirs("crash-logs", exist_ok=True)
+        with open(f"crash-logs/error-{timestamp}.json", "w") as f:
+            json.dump(log_data, f, indent=4)
+        print(f"✅ Local Log Saved: crash-logs/error-{timestamp}.json")
     except Exception as e:
-        print(f"❌ S3 Upload failed: {e}")
+        print(f"❌ Local Logging failed: {e}")
 
-# ==========================================
-# GLOBAL STATE STORE (Loaded once at startup)
-# ==========================================
 ml_assets = {
     "rf_model": None,
     "feature_columns": None,
@@ -61,99 +34,45 @@ ml_assets = {
 }
 
 def resolve_file_path(filename: str, subfolder: str) -> str:
-    """Helper to locate files."""
     base_dir = os.path.dirname(os.path.abspath(__file__))
     primary_path = os.path.join(base_dir, subfolder, filename)
     fallback_path = os.path.join(base_dir, filename)
-
-    if os.path.exists(primary_path):
-        return primary_path
-    elif os.path.exists(fallback_path):
-        return fallback_path
-    else:
-        raise FileNotFoundError(f"Required file '{filename}' not found.")
+    if os.path.exists(primary_path): return primary_path
+    elif os.path.exists(fallback_path): return fallback_path
+    else: raise FileNotFoundError(f"Required file '{filename}' not found.")
 
 def build_sandbox() -> pd.DataFrame:
-    """Fetches data from AWS DynamoDB and builds the Pandas DataFrame."""
-    print("⏳ Fetching data from AWS DynamoDB...")
+    print("⏳ Fetching data from Local MongoDB...")
+    client = MongoClient("mongodb+srv://abhay_panchal:1234@cluster0.ois4m98.mongodb.net/collegeDB")
+    db = client["collegeDB"]
+    collection = db["colleges"]
     
-    # DynamoDB connection setup
-    dynamodb = boto3.resource(
-        'dynamodb',
-        region_name=os.getenv('AWS_DEFAULT_REGION', 'us-east-1'),
-        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-        aws_session_token=os.getenv('AWS_SESSION_TOKEN')
-    )
-    table = dynamodb.Table('CollegeRecommendationDB')
+    items = list(collection.find({}, {"_id": 0}))
+    print(f"✅ Fetched {len(items)} records from MongoDB.")
     
-    # Scan karke saara data fetch karna
-    response = table.scan()
-    items = response.get('Items', [])
-    
-    # AWS pagination handle karna (agar data bada ho)
-    while 'LastEvaluatedKey' in response:
-        response = table.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
-        items.extend(response.get('Items', []))
-        
-    print(f"✅ Fetched {len(items)} records from DynamoDB.")
-    
-    # Cloud data ko Pandas DataFrame mein convert karna
     sandbox = pd.DataFrame(items)
-    
-    # AWS DynamoDB numbers ko 'Decimal' format mein bhejta hai, 
-    # ML model ke liye inko float mein convert karna zaroori hai.
-    for col in sandbox.columns:
-        if sandbox[col].apply(lambda x: isinstance(x, Decimal)).any():
-            sandbox[col] = sandbox[col].astype(float)
-            
-    # Purana data cleaning logic (Same as before)
-    sandbox["Base_Tuition_Fee"] = pd.to_numeric(sandbox["Base_Tuition_Fee"], errors='coerce').fillna(100000.0)
+    if "Base_Tuition_Fee" in sandbox.columns:
+        sandbox["Base_Tuition_Fee"] = pd.to_numeric(sandbox["Base_Tuition_Fee"], errors='coerce').fillna(100000.0)
     sandbox = sandbox.dropna(subset=["Course_Domain"]).reset_index(drop=True)
-    
     return sandbox
 
-# ==========================================
-# FASTAPI LIFESPAN
-# ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("🚀 Starting FastAPI Server: Loading ML Models & Building DWM Sandbox...")
+    print("🚀 Starting FastAPI Server (Local DB Mode)...")
     try:
-        model_path = resolve_file_path("rf_admission_predictor.pkl", "models")
-        features_path = resolve_file_path("model_features_list.pkl", "models")
-
-        ml_assets["rf_model"] = joblib.load(model_path)
-        ml_assets["feature_columns"] = joblib.load(features_path)
+        ml_assets["rf_model"] = joblib.load(resolve_file_path("rf_admission_predictor.pkl", "models"))
+        ml_assets["feature_columns"] = joblib.load(resolve_file_path("model_features_list.pkl", "models"))
         ml_assets["sandbox_df"] = build_sandbox()
-
-        print(f"✅ Loaded Random Forest Model & {len(ml_assets['feature_columns'])} Features.")
         print(f"✅ Sandbox Ready with {len(ml_assets['sandbox_df'])} Options!")
     except Exception as e:
-        log_failure_to_s3(e, module="Startup_Lifespan")
-        print(f"❌ Startup Error: {e}")
+        log_failure_local(e, module="Startup_Lifespan")
         raise e
     yield
     print("🛑 Shutting down FastAPI Server...")
 
-app = FastAPI(
-    title="Hybrid Engineering College Recommendation API",
-    description="DWM Microproject - RF Predictor + S3 Error Logging",
-    version="1.0.0",
-    lifespan=lifespan,
-)
+app = FastAPI(title="Local Hybrid College Recommender", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ==========================================
-# PYDANTIC SCHEMAS
-# ==========================================
 class StudentProfileRequest(BaseModel):
     ssc_marks: Optional[float] = Field(default=85.0, ge=0, le=100)
     hsc_marks: Optional[float] = Field(default=80.0, ge=0, le=100)
@@ -185,17 +104,6 @@ class RecommendationResponse(BaseModel):
     qualified_branches: int
     recommendations: List[CollegeRecommendation]
 
-# ==========================================
-# API ENDPOINTS
-# ==========================================
-@app.get("/")
-def health_check():
-    return {
-        "status": "online",
-        "project": "Hybrid College Recommender",
-        "sandbox_branches": len(ml_assets["sandbox_df"]) if ml_assets["sandbox_df"] is not None else 0,
-    }
-
 @app.post("/api/recommend", response_model=RecommendationResponse)
 def recommend_colleges(profile: StudentProfileRequest):
     try:
@@ -206,7 +114,6 @@ def recommend_colleges(profile: StudentProfileRequest):
         feature_columns = ml_assets["feature_columns"]
         sandbox = ml_assets["sandbox_df"].copy()
 
-        # STEP 1: ENCODE FOR ML
         input_data = sandbox[["Base_Tuition_Fee", "College_Tier", "City_Tier", "Course_Domain"]].copy()
         input_data.rename(columns={"Base_Tuition_Fee": "Tuition_Fee"}, inplace=True)
         input_data["Student_Percentile"] = profile.percentile
@@ -222,11 +129,9 @@ def recommend_colleges(profile: StudentProfileRequest):
                 input_encoded[col] = 0
         input_encoded = input_encoded[feature_columns]
 
-        # STEP 2: PREDICT
         probabilities = rf_model.predict_proba(input_encoded)[:, 1]
         sandbox["Admission_Probability"] = probabilities
 
-        # STEP 3: DYNAMIC CATEGORY FEES & SCORE
         category_fee_map = {
             "OPEN": "Fee_OPEN", "OBC": "Fee_OBC", "SC": "Fee_SC", 
             "ST": "Fee_ST", "VJ/NT": "Fee_VJNT"
@@ -254,7 +159,6 @@ def recommend_colleges(profile: StudentProfileRequest):
             (sandbox["Budget_Score"] * 0.4) + (sandbox["Location_Score"] * 0.2) + (sandbox["Domain_Score"] * 0.4)
         )
 
-        # STEP 4: RANK & FILTER
         valid_options = sandbox[sandbox["Admission_Probability"] >= 0.30].copy()
         qualified_count = len(valid_options)
 
@@ -268,7 +172,6 @@ def recommend_colleges(profile: StudentProfileRequest):
         valid_options = valid_options.sort_values(by="Final_Rank_Score", ascending=False)
         top_10 = valid_options.drop_duplicates(subset=["College_Name"]).head(10)
 
-        # STEP 5: FORMAT RESPONSE
         recommendations = []
         for idx, (_, row) in enumerate(top_10.iterrows(), start=1):
             recommendations.append(
@@ -298,6 +201,5 @@ def recommend_colleges(profile: StudentProfileRequest):
         )
 
     except Exception as e:
-        # S3 LOGGING TRIGGERED ON ERROR
-        log_failure_to_s3(e, module="RecommendationAPI")
-        raise HTTPException(status_code=500, detail="Backend engine failed. Diagnostics sent to S3.")
+        log_failure_local(e, module="RecommendationAPI")
+        raise HTTPException(status_code=500, detail="Backend engine failed. Local diagnostics saved.")
